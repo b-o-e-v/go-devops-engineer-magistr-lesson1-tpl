@@ -2,36 +2,52 @@ package main
 
 import (
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"time"
+
+	"github.com/b-o-e-v/go-devops-engineer-magistr-lesson1-tpl/server"
 )
 
-func getResourceUsage() error {
-	res, err := http.Get("http://srv.msk01.gigacorp.local/_stats")
+func getResourceUsage() (string, error) {
+	response, err := http.Get("https://srv.msk01.gigacorp.local/_stats")
 
 	if err != nil {
-		return err
+		return "", err
 	}
 
-	defer res.Body.Close()
-
-	body, err := ioutil.ReadAll(res.Body)
+	body, err := io.ReadAll(response.Body)
+	response.Body.Close()
 
 	if err != nil {
-		return err
+		return "", err
 	}
 
-	fmt.Println(body)
-
-	return nil
+	return string(body), nil
 }
 
 func main() {
-	ticker := time.NewTicker(10 * time.Second)
+	ticker := time.NewTicker(1 * time.Second)
 	defer ticker.Stop()
 
 	for range ticker.C {
-		getResourceUsage()
+		res, err := getResourceUsage()
+
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+
+		status, err := server.ParseStatus(res)
+
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+
+		status.CheckLoadAverage()
+		status.CheckMemoryUsage()
+		status.CheckDiskSpace()
+		status.CheckNetworkUsage()
 	}
 }
