@@ -1,9 +1,16 @@
-package server
+package profiler
 
 import (
 	"fmt"
 	"strconv"
 	"strings"
+)
+
+const (
+	loadThreshold    = 30
+	memoryThreshold  = 80
+	diskThreshold    = 90
+	networkThreshold = 90
 )
 
 // LoadAverage: текущий Load Average сервера
@@ -13,7 +20,7 @@ import (
 // UsedDiskSpace: текущее потребление дискового пространства сервера в байтах
 // NetworkBandwidth: текущая пропускная способность сети в байтах в секунду
 // NetworkUsage: текущая загруженность сети в байтах в секунду
-type ServerStatus struct {
+type Profiler struct {
 	LoadAverage      int
 	TotalMemory      int
 	UsedMemory       int
@@ -23,49 +30,51 @@ type ServerStatus struct {
 	NetworkUsage     int
 }
 
-func (s *ServerStatus) CheckLoadAverage() {
-	if s.LoadAverage > 30 {
+func (s *Profiler) CheckLoadAverage() {
+	if s.LoadAverage > loadThreshold {
 		fmt.Printf("Load Average is too high: %d\n", s.LoadAverage)
 	}
 }
 
-func (s *ServerStatus) CheckMemoryUsage() {
+func (s *Profiler) CheckMemoryUsage() {
 	usagePercent := s.UsedMemory * 100 / s.TotalMemory
-	if usagePercent > 80 {
+	if usagePercent > memoryThreshold {
 		fmt.Printf("Memory usage too high: %d%%\n", usagePercent)
 	}
 }
 
-func (s *ServerStatus) CheckDiskSpace() {
-	freeSpace := s.TotalDiskSpace - s.UsedDiskSpace
-	if s.UsedDiskSpace*100/s.TotalDiskSpace > 90 {
-		fmt.Printf("Free disk space is too low: %d Mb left\n", freeSpace/1024/1024)
+func (s *Profiler) CheckDiskSpace() {
+	usagePercent := s.UsedDiskSpace * 100 / s.TotalDiskSpace
+	freeSpace := (s.TotalDiskSpace - s.UsedDiskSpace) / 1024 / 1024
+	if usagePercent > diskThreshold {
+		fmt.Printf("Free disk space is too low: %d Mb left\n", freeSpace)
 	}
 }
 
-func (s *ServerStatus) CheckNetworkUsage() {
-	freeBandwidth := s.NetworkBandwidth - s.NetworkUsage
-	if s.NetworkUsage*100/s.NetworkBandwidth > 90 {
-		fmt.Printf("Network bandwidth usage high: %d Mbit/s available\n", freeBandwidth*8/1024/1024)
+func (s *Profiler) CheckNetworkUsage() {
+	usagePercent := s.NetworkUsage * 100 / s.NetworkBandwidth
+	freeBandwidth := (s.NetworkBandwidth - s.NetworkUsage) / 1000 / 1000
+	if usagePercent > networkThreshold {
+		fmt.Printf("Network bandwidth usage high: %d Mbit/s available\n", freeBandwidth)
 	}
 }
 
-func ParseStatus(data string) (ServerStatus, error) {
+func Parse(data string) (Profiler, error) {
 	parts := strings.Split(data, ",")
 	if len(parts) != 7 {
-		return ServerStatus{}, fmt.Errorf("invalid data format")
+		return Profiler{}, fmt.Errorf("invalid data format")
 	}
 
 	values := make([]int, 7)
 	for i, part := range parts {
 		value, err := strconv.Atoi(part)
 		if err != nil {
-			return ServerStatus{}, fmt.Errorf("invalid number: %s", part)
+			return Profiler{}, fmt.Errorf("invalid number: %s", part)
 		}
 		values[i] = value
 	}
 
-	return ServerStatus{
+	return Profiler{
 		LoadAverage:      values[0],
 		TotalMemory:      values[1],
 		UsedMemory:       values[2],

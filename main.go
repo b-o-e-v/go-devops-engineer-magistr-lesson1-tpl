@@ -1,60 +1,28 @@
 package main
 
 import (
-	"fmt"
-	"io"
-	"net/http"
-	"time"
-
-	"github.com/b-o-e-v/go-devops-engineer-magistr-lesson1-tpl/server"
+	"github.com/b-o-e-v/go-devops-engineer-magistr-lesson1-tpl/poller"
+	"github.com/b-o-e-v/go-devops-engineer-magistr-lesson1-tpl/profiler"
 )
 
-func getResourceUsage() (string, error) {
-	response, err := http.Get("https://srv.msk01.gigacorp.local/_stats")
-	if err != nil {
-		return "", err
-	}
-	defer response.Body.Close()
-
-	if response.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("unexpected HTTP status: %s", response.Status)
-	}
-
-	body, err := io.ReadAll(response.Body)
-	if err != nil {
-		return "", err
-	}
-
-	return string(body), nil
-}
+const (
+	serverURL  = "http://srv.msk01.gigacorp.local/_stats"
+	retryCount = 3
+)
 
 func main() {
-	ticker := time.NewTicker(5 * time.Second)
-	defer ticker.Stop()
+	ch := poller.Create(serverURL, retryCount)
 
-	errorCount := 0
+	for res := range ch() {
+		stats, err := profiler.Parse(res)
 
-	for range ticker.C {
-		res, err := getResourceUsage()
 		if err != nil {
-			errorCount++
-		} else {
-			status, err := server.ParseStatus(res)
-			if err != nil {
-				errorCount++
-			} else {
-				errorCount = 0
-
-				status.CheckLoadAverage()
-				status.CheckMemoryUsage()
-				status.CheckDiskSpace()
-				status.CheckNetworkUsage()
-			}
+			continue
 		}
 
-		if errorCount >= 3 {
-			fmt.Println("Unable to fetch server statistic.")
-			errorCount = 0
-		}
+		stats.CheckLoadAverage()
+		stats.CheckMemoryUsage()
+		stats.CheckDiskSpace()
+		stats.CheckNetworkUsage()
 	}
 }
