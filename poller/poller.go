@@ -17,6 +17,8 @@ func Create(url string, retryCount int) func() chan string {
 			defer close(ch)
 
 			for {
+				time.Sleep(500 * time.Millisecond)
+
 				if errorCount >= retryCount {
 					fmt.Printf("Unable to fetch server statistic")
 					break
